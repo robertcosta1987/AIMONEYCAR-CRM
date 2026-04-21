@@ -1,0 +1,11 @@
+# Exclude dev/test artifacts from deployment
+# NOTE: Deploy via zip upload (see deploy.sh) not func publish, due to pnpm symlinks
+local.settings.json
+.env
+*.test.ts
+*.spec.ts
+src/
+tsconfig.json
+Dockerfile
+*.md
+node_modules/
