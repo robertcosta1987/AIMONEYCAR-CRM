@@ -73,8 +73,9 @@ export default function ImportarPage() {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) throw new Error('Sessão expirada. Faça login novamente.')
 
-        const azureUrl = process.env.NEXT_PUBLIC_IMPORT_SERVICE_URL
-        if (!azureUrl) throw new Error('Serviço de importação não configurado (NEXT_PUBLIC_IMPORT_SERVICE_URL)')
+        const azureBase = process.env.NEXT_PUBLIC_IMPORT_SERVICE_URL
+        if (!azureBase) throw new Error('Serviço de importação não configurado (NEXT_PUBLIC_IMPORT_SERVICE_URL)')
+        const azureUrl = `${azureBase}/api/importMdb`
 
         // Step 1: get presigned upload URL
         setStatusLabel('Preparando upload...')
@@ -284,7 +285,7 @@ export default function ImportarPage() {
 
       const azureBase = process.env.NEXT_PUBLIC_IMPORT_SERVICE_URL
       if (!azureBase) throw new Error('Serviço não configurado')
-      const clearUrl = azureBase.replace(/importmdb/i, 'cleardata')
+      const clearUrl = `${azureBase}/api/clearData`
 
       const res = await fetch(clearUrl, {
         method: 'DELETE',
