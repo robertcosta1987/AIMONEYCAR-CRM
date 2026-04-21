@@ -314,3 +314,28 @@
 ::-webkit-scrollbar-track { background: rgb(var(--bg-paper)); }
 ::-webkit-scrollbar-thumb { background: rgb(var(--border-hover)); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--fg-subtle)); }
+
+/* ── CRM scoped light theme ─────────────────────────────────────────────────── */
+
+.crm-scope {
+  --crm-bg:          #F8FAFC;
+  --crm-bg-elevated: #FFFFFF;
+  --crm-bg-paper:    #F1F5F9;
+  --crm-border:      #E2E8F0;
+  --crm-text:        #0F172A;
+  --crm-text-muted:  #475569;
+  --crm-text-subtle: #94A3B8;
+  --crm-accent:      #6366F1;
+  --crm-accent-2:    #8B5CF6;
+  --crm-aqua:        #06B6D4;
+  --crm-success:     #10B981;
+  --crm-warning:     #F59E0B;
+  --crm-danger:      #EF4444;
+  --crm-hot:         #F43F5E;
+  --crm-warm:        #F59E0B;
+  --crm-cold:        #3B82F6;
+
+  background-color: var(--crm-bg);
+  color: var(--crm-text);
+  min-height: 100%;
+}
