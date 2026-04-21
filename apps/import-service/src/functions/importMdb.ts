@@ -302,6 +302,15 @@ async function insertBatch(
   return count
 }
 
+// ─── JWT helpers ─────────────────────────────────────────────────────────────
+
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const part = token.split('.')[1]
+    return JSON.parse(Buffer.from(part, 'base64').toString('utf8'))
+  } catch { return null }
+}
+
 // ─── CORS helper ─────────────────────────────────────────────────────────────
 
 function corsHeaders(origin: string): Record<string, string> {
@@ -340,8 +349,21 @@ async function importMdbHandler(req: HttpRequest, ctx: InvocationContext): Promi
   const token = authHeader.replace(/^Bearer\s+/i, '').trim()
   if (!token) return json(401, { error: 'Unauthorized' }, cors)
 
-  const { data: { user }, error: authErr } = await getSvc().auth.getUser(token)
-  if (authErr || !user) return json(401, { error: 'Invalid token' }, cors)
+  // Decode JWT to find which Supabase project issued it (handles multi-project setups)
+  const claims = decodeJwtPayload(token)
+  const issuer = claims?.iss as string | undefined
+  const projectUrl = issuer ? issuer.replace(/\/auth\/v1$/, '') : process.env.SUPABASE_URL!
+  ctx.log(`auth: iss=${issuer} projectUrl=${projectUrl} token_prefix=${token.slice(0,20)}`)
+
+  const userRes = await fetch(`${projectUrl}/auth/v1/user`, {
+    headers: { apikey: process.env.SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` },
+  })
+  if (!userRes.ok) {
+    const errBody = await userRes.json().catch(() => ({}))
+    ctx.log(`auth failed: status=${userRes.status} msg=${errBody?.msg}`)
+    return json(401, { error: `Invalid token: ${errBody?.msg ?? userRes.status}` }, cors)
+  }
+  const user = await userRes.json() as { id: string }
 
   // Get dealership
   const { data: profile } = await getSvc().from('users').select('dealership_id').eq('id', user.id).single()
@@ -1102,8 +1124,13 @@ async function clearDataHandler(req: HttpRequest, ctx: InvocationContext): Promi
     const token = authHeader.replace(/^Bearer\s+/i, '').trim()
     if (!token) return json(401, { error: 'Unauthorized' }, cors)
 
-    const { data: { user }, error: authErr } = await getSvc().auth.getUser(token)
-    if (authErr || !user) return json(401, { error: 'Invalid token' }, cors)
+    const claims = decodeJwtPayload(token)
+    const projectUrl = claims?.iss ? (claims.iss as string).replace(/\/auth\/v1$/, '') : process.env.SUPABASE_URL!
+    const userRes2 = await fetch(`${projectUrl}/auth/v1/user`, {
+      headers: { apikey: process.env.SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` },
+    })
+    if (!userRes2.ok) return json(401, { error: 'Invalid token' }, cors)
+    const user = await userRes2.json() as { id: string }
 
     const { data: profile } = await getSvc().from('users').select('dealership_id').eq('id', user.id).single()
     if (!profile?.dealership_id) return json(400, { error: 'No dealership' }, cors)
