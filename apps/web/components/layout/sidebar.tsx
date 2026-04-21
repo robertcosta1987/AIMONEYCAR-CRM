@@ -25,9 +25,7 @@ const groups: NavGroup[] = [
   {
     label: 'CRM / Leads',
     items: [
-      ...(process.env.NEXT_PUBLIC_CRM_ENABLED === 'true'
-        ? [{ href: '/dashboard/crm', icon: Kanban, label: 'Pipeline CRM' }]
-        : []),
+      { href: '/dashboard/crm',            icon: Kanban,        label: 'Pipeline CRM'  },
       { href: '/dashboard/whatsapp',       icon: MessageCircle, label: 'WhatsApp'      },
       { href: '/dashboard/chat-clientes',  icon: Users,         label: 'Chat Clientes' },
       { href: '/dashboard/agenda',         icon: CalendarDays,  label: 'Agenda'        },
