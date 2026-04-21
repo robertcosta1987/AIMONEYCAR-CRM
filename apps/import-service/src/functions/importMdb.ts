@@ -1055,6 +1055,81 @@ async function processImportInBackground(
   counts.nfe_dest = (phD_nfe as any).nfe_dest
   counts.nfe_prod = (phD_nfe as any).nfe_prod
 
+  // ── Phase E: Create leads for imported customers ────────────────────────────
+  // The CRM Kanban shows `leads`, not raw `customers`.
+  // For every imported customer that has no existing lead, create one in the
+  // first stage of the default pipeline so they appear in the CRM pipeline.
+
+  try {
+    const { data: firstStage } = await getSvc()
+      .from('pipeline_stages')
+      .select('id')
+      .eq('dealership_id', D)
+      .eq('is_terminal_won', false)
+      .eq('is_terminal_lost', false)
+      .order('position', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (firstStage?.id) {
+      const allCustIds = Object.values(customerIdByExternal)
+
+      // Determine which customers already have at least one lead
+      const existingLeadCustIds = new Set<string>()
+      for (let i = 0; i < allCustIds.length; i += 1000) {
+        const chunk = allCustIds.slice(i, i + 1000)
+        const { data: existingLeads } = await getSvc()
+          .from('leads')
+          .select('customer_id')
+          .eq('dealership_id', D)
+          .in('customer_id', chunk)
+        ;(existingLeads ?? []).forEach((l: any) => { if (l.customer_id) existingLeadCustIds.add(l.customer_id) })
+      }
+
+      // Build a quick lookup of customer info from the already-loaded clienteRows
+      const clienteInfoMap: Record<string, { name: string; phone: string | null; email: string | null; cpf: string | null }> = {}
+      for (const r of (clienteRows as any[])) {
+        if (!r.cliid) continue
+        const custId = customerIdByExternal[String(r.cliid)]
+        if (!custId) continue
+        const docRaw = str(r.cliCNPJ_CPF) ?? ''
+        const docDigits = docRaw.replace(/\D/g, '')
+        clienteInfoMap[custId] = {
+          name: str(r.cliNome) ?? 'Sem nome',
+          phone: str(r.cliFone1) ?? str(r.cliFone2) ?? null,
+          email: str(r.cliEmail) ?? null,
+          cpf: docDigits.length === 11 ? docRaw : null,
+        }
+      }
+
+      const newLeads = allCustIds
+        .filter(custId => !existingLeadCustIds.has(custId))
+        .map(custId => {
+          const info = clienteInfoMap[custId] ?? { name: 'Sem nome', phone: null, email: null, cpf: null }
+          return {
+            dealership_id: D,
+            source: 'import',
+            customer_id: custId,
+            name: info.name,
+            phone: info.phone,
+            email: info.email,
+            cpf: info.cpf,
+            stage_id: firstStage.id,
+            status: 'open',
+            temperature: 'cold',
+            score: 0,
+          }
+        })
+
+      counts.leads = await insertBatch('leads', newLeads, errors)
+      ctx.log(`Phase E done. Leads created: ${counts.leads} of ${allCustIds.length} customers (${existingLeadCustIds.size} already had leads)`)
+    } else {
+      ctx.log('Phase E skipped: no default pipeline stage found')
+    }
+  } catch (e: any) {
+    ctx.log(`Phase E error (non-fatal): ${e?.message}`)
+  }
+
   try { await getSvc().rpc('refresh_days_in_stock', { d_id: D }) } catch { /* non-critical */ }
   try {
     const connStr = process.env.AzureWebJobsStorage!
@@ -1173,6 +1248,10 @@ async function clearDataHandler(req: HttpRequest, ctx: InvocationContext): Promi
 
     // Level 2: depend on vehicles/customers
     await Promise.all(['expenses', 'insurances', 'financings', 'orders'].map(t => delBatched(t)))
+
+    // Level 2b: CRM leads (lead_activities cascade from leads FK)
+    await Promise.all(['lead_vehicle_interest', 'lead_activities', 'sequence_enrollments'].map(t => delBatched(t)))
+    await delBatched('leads')
 
     // Level 3: main entities (sequential to avoid deadlocks on large datasets)
     await delBatched('vehicles')
