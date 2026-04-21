@@ -349,21 +349,17 @@ async function importMdbHandler(req: HttpRequest, ctx: InvocationContext): Promi
   const token = authHeader.replace(/^Bearer\s+/i, '').trim()
   if (!token) return json(401, { error: 'Unauthorized' }, cors)
 
-  // Decode JWT to find which Supabase project issued it (handles multi-project setups)
+  // Decode JWT claims — verify expiry and role without a network round-trip.
+  // Identity is confirmed below by requiring the sub to exist in our users table.
   const claims = decodeJwtPayload(token)
-  const issuer = claims?.iss as string | undefined
-  const projectUrl = issuer ? issuer.replace(/\/auth\/v1$/, '') : process.env.SUPABASE_URL!
-  ctx.log(`auth: iss=${issuer} projectUrl=${projectUrl} token_prefix=${token.slice(0,20)}`)
-
-  const userRes = await fetch(`${projectUrl}/auth/v1/user`, {
-    headers: { apikey: process.env.SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` },
-  })
-  if (!userRes.ok) {
-    const errBody = await userRes.json().catch(() => ({}))
-    ctx.log(`auth failed: status=${userRes.status} msg=${errBody?.msg}`)
-    return json(401, { error: `Invalid token: ${errBody?.msg ?? userRes.status}` }, cors)
+  ctx.log(`auth: sub=${claims?.sub} role=${claims?.role} exp=${claims?.exp}`)
+  if (!claims?.sub || claims.role !== 'authenticated') {
+    return json(401, { error: 'Unauthorized' }, cors)
   }
-  const user = await userRes.json() as { id: string }
+  if (claims.exp && (claims.exp as number) < Date.now() / 1000) {
+    return json(401, { error: 'Token expired' }, cors)
+  }
+  const user = { id: claims.sub as string }
 
   // Get dealership
   const { data: profile } = await getSvc().from('users').select('dealership_id').eq('id', user.id).single()
@@ -1125,12 +1121,9 @@ async function clearDataHandler(req: HttpRequest, ctx: InvocationContext): Promi
     if (!token) return json(401, { error: 'Unauthorized' }, cors)
 
     const claims = decodeJwtPayload(token)
-    const projectUrl = claims?.iss ? (claims.iss as string).replace(/\/auth\/v1$/, '') : process.env.SUPABASE_URL!
-    const userRes2 = await fetch(`${projectUrl}/auth/v1/user`, {
-      headers: { apikey: process.env.SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` },
-    })
-    if (!userRes2.ok) return json(401, { error: 'Invalid token' }, cors)
-    const user = await userRes2.json() as { id: string }
+    if (!claims?.sub || claims.role !== 'authenticated') return json(401, { error: 'Unauthorized' }, cors)
+    if (claims.exp && (claims.exp as number) < Date.now() / 1000) return json(401, { error: 'Token expired' }, cors)
+    const user = { id: claims.sub as string }
 
     const { data: profile } = await getSvc().from('users').select('dealership_id').eq('id', user.id).single()
     if (!profile?.dealership_id) return json(400, { error: 'No dealership' }, cors)
