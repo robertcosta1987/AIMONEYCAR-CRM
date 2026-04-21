@@ -15,19 +15,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Get user + dealership info
   const { data: userData } = await supabase
     .from('users')
-    .select('name, dealership:dealerships(name)')
+    .select('name, dealership_id, dealership:dealerships(id, name)')
     .eq('id', user.id)
     .single()
 
   const dealership = userData?.dealership as any
+  const dealershipId = userData?.dealership_id
 
   // Count unread alerts
-  const { count: alertCount } = await supabase
+  const { count: alertCount } = dealershipId ? await supabase
     .from('ai_alerts')
     .select('id', { count: 'exact', head: true })
-    .eq('dealership_id', dealership?.id)
+    .eq('dealership_id', dealershipId)
     .eq('is_read', false)
-    .eq('is_dismissed', false)
+    .eq('is_dismissed', false) : { count: 0 }
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
