@@ -70,8 +70,8 @@ export default function ImportarPage() {
       if (isMdb(file)) {
         // MDB → upload to Supabase Storage first, then call Azure with the path
         const supabase = createClient()
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) throw new Error('Sessão expirada. Faça login novamente.')
+        const { data: { session }, error: sessionErr } = await supabase.auth.refreshSession()
+        if (sessionErr || !session) throw new Error('Sessão expirada. Faça login novamente.')
 
         const azureBase = process.env.NEXT_PUBLIC_IMPORT_SERVICE_URL
         if (!azureBase) throw new Error('Serviço de importação não configurado (NEXT_PUBLIC_IMPORT_SERVICE_URL)')

@@ -335,19 +335,13 @@ async function importMdbHandler(req: HttpRequest, ctx: InvocationContext): Promi
 
   try {
 
-  // Auth: verify Supabase JWT
+  // Auth: verify Supabase JWT via service client
   const authHeader = req.headers.get('authorization') ?? ''
   const token = authHeader.replace(/^Bearer\s+/i, '').trim()
   if (!token) return json(401, { error: 'Unauthorized' }, cors)
 
-  const userRes = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      apikey: process.env.SUPABASE_ANON_KEY!,
-      Authorization: `Bearer ${token}`,
-    },
-  })
-  if (!userRes.ok) return json(401, { error: 'Invalid token' }, cors)
-  const user = await userRes.json() as { id: string }
+  const { data: { user }, error: authErr } = await getSvc().auth.getUser(token)
+  if (authErr || !user) return json(401, { error: 'Invalid token' }, cors)
 
   // Get dealership
   const { data: profile } = await getSvc().from('users').select('dealership_id').eq('id', user.id).single()
@@ -1108,11 +1102,8 @@ async function clearDataHandler(req: HttpRequest, ctx: InvocationContext): Promi
     const token = authHeader.replace(/^Bearer\s+/i, '').trim()
     if (!token) return json(401, { error: 'Unauthorized' }, cors)
 
-    const userRes = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: process.env.SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` },
-    })
-    if (!userRes.ok) return json(401, { error: 'Invalid token' }, cors)
-    const user = await userRes.json() as { id: string }
+    const { data: { user }, error: authErr } = await getSvc().auth.getUser(token)
+    if (authErr || !user) return json(401, { error: 'Invalid token' }, cors)
 
     const { data: profile } = await getSvc().from('users').select('dealership_id').eq('id', user.id).single()
     if (!profile?.dealership_id) return json(400, { error: 'No dealership' }, cors)
