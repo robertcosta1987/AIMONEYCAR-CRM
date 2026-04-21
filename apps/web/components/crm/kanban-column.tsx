@@ -14,7 +14,7 @@ export function KanbanColumn({ stage, onLeadClick }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
 
   return (
-    <div className="flex-shrink-0 w-72">
+    <div className="min-w-0">
       {/* Stage header */}
       <div className="flex items-center gap-2 mb-3 px-1">
         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: stage.color }} />

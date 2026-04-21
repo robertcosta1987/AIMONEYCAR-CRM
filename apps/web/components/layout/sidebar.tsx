@@ -5,7 +5,7 @@ import {
   LayoutDashboard, MessageSquare, Car, Bell, Receipt,
   BarChart3, Upload, Settings, LogOut, ChevronLeft, ChevronRight,
   CalendarDays, Users, CalendarClock, Timer, DollarSign, FileBarChart2,
-  MessageCircle, Sparkles, ChevronDown, BrainCircuit, ExternalLink, Kanban,
+  MessageCircle, Sparkles, ChevronDown, BrainCircuit, ExternalLink, Kanban, Workflow, Zap,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -26,6 +26,7 @@ const groups: NavGroup[] = [
     label: 'CRM / Leads',
     items: [
       { href: '/dashboard/crm',            icon: Kanban,        label: 'Pipeline CRM'  },
+      { href: '/dashboard/workflow',       icon: Zap,           label: 'Workflow'      },
       { href: '/dashboard/whatsapp',       icon: MessageCircle, label: 'WhatsApp'      },
       { href: '/dashboard/chat-clientes',  icon: Users,         label: 'Chat Clientes' },
       { href: '/dashboard/agenda',         icon: CalendarDays,  label: 'Agenda'        },

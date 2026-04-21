@@ -154,9 +154,9 @@ export function KanbanBoard() {
         </GlassCard>
       </div>
 
-      {/* Kanban */}
+      {/* Kanban — 3-col grid so all stages fit without horizontal scrolling */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {stages.map(stage => (
             <KanbanColumn
               key={stage.id}
