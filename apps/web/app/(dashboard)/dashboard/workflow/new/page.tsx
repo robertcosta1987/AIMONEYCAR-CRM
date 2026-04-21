@@ -194,7 +194,7 @@ function ActionCard({ action, onChange, onDelete, index }: {
 function NewWorkflowForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const templateKey = searchParams.get('template') ?? ''
+  const templateKey = searchParams?.get('template') ?? ''
   const template = TEMPLATE_DEFAULTS[templateKey]
 
   const [name, setName] = useState(template ? TRIGGER_OPTIONS.find(t => t.value === template.trigger)?.label ?? '' : '')
