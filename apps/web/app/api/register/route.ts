@@ -73,6 +73,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: userErr.message }, { status: 400 })
     }
 
+    // Ensure CRM pipeline exists for the new dealership (idempotent)
+    await supabase.rpc('seed_default_pipeline', { p_dealership_id: dealershipId })
+
     // Verify the write actually persisted
     const { data: verify } = await supabase
       .from('users')
