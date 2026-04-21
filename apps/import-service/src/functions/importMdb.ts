@@ -305,8 +305,8 @@ async function insertBatch(
 // ─── CORS helper ─────────────────────────────────────────────────────────────
 
 function corsHeaders(origin: string): Record<string, string> {
-  const allowed = (process.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim())
-  const allowedOrigin = allowed.includes(origin) ? origin : (allowed[0] ?? '*')
+  const allowed = (process.env.ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim())
+  const allowedOrigin = allowed.includes('*') ? '*' : (allowed.includes(origin) ? origin : (allowed[0] ?? '*'))
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
