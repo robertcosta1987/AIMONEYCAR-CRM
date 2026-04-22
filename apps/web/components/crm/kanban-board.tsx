@@ -1,12 +1,7 @@
 'use client'
-import { useState, useCallback } from 'react'
-import {
-  DndContext, DragEndEvent, DragOverlay, DragStartEvent,
-  PointerSensor, useSensor, useSensors,
-} from '@dnd-kit/core'
+import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { KanbanColumn } from './kanban-column'
-import { LeadCard } from './lead-card'
 import { LeadDrawer } from './lead-drawer'
 import { LeadForm } from './lead-form'
 import { GlassCard } from './primitives/glass-card'
@@ -22,14 +17,8 @@ async function fetchPipeline() {
 
 export function KanbanBoard() {
   const queryClient = useQueryClient()
-  const [dragLead, setDragLead] = useState<Lead | null>(null)
-  const [dragStageId, setDragStageId] = useState<string>('')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showCreate, setShowCreate] = useState(false)
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  )
 
   const { data: pipeline, isLoading, error, refetch } = useQuery({
     queryKey: ['crm-pipeline'],
@@ -37,50 +26,6 @@ export function KanbanBoard() {
     staleTime: 5_000,
     refetchInterval: 60_000,
   })
-
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setDragLead(event.active.data.current?.lead ?? null)
-    setDragStageId(event.active.data.current?.stageId ?? '')
-  }, [])
-
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    const lead = dragLead
-    setDragLead(null)
-    setDragStageId('')
-
-    const { over } = event
-    if (!over || !lead || over.id === dragStageId) return
-
-    const toStageId = over.id as string
-
-    // Optimistic update
-    queryClient.setQueryData(['crm-pipeline'], (old: typeof pipeline) => {
-      if (!old) return old
-      return {
-        ...old,
-        stages: old.stages.map(stage => {
-          if (stage.id === dragStageId) {
-            return { ...stage, leads: stage.leads.filter(l => l.id !== lead.id) }
-          }
-          if (stage.id === toStageId) {
-            return { ...stage, leads: [{ ...lead, stage_id: toStageId }, ...stage.leads] }
-          }
-          return stage
-        }),
-      }
-    })
-
-    try {
-      const res = await fetch(`/api/crm/leads/${lead.id}/stage`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stage_id: toStageId }),
-      })
-      if (!res.ok) throw new Error('Failed to move lead')
-    } catch {
-      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] })
-    }
-  }, [dragLead, dragStageId, queryClient])
 
   if (isLoading) {
     return (
@@ -154,33 +99,22 @@ export function KanbanBoard() {
         </GlassCard>
       </div>
 
-      {/* Kanban — 3-col grid so all stages fit without horizontal scrolling */}
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {stages.map(stage => (
-            <KanbanColumn
-              key={stage.id}
-              stage={stage}
-              onLeadClick={setSelectedLead}
-            />
-          ))}
-        </div>
-
-        <DragOverlay dropAnimation={{ duration: 150, easing: 'ease' }}>
-          {dragLead && (
-            <LeadCard
-              lead={dragLead}
-              stageId={dragStageId}
-              onOpen={() => {}}
-              isDragOverlay
-            />
-          )}
-        </DragOverlay>
-      </DndContext>
+      {/* Stage accordion list */}
+      <div className="space-y-2">
+        {stages.map((stage, i) => (
+          <KanbanColumn
+            key={stage.id}
+            stage={stage}
+            onLeadClick={setSelectedLead}
+            defaultOpen={i === 0}
+          />
+        ))}
+      </div>
 
       {/* Lead detail drawer */}
       <LeadDrawer
         lead={selectedLead}
+        stages={stages}
         onClose={() => setSelectedLead(null)}
         onUpdate={() => queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] })}
       />

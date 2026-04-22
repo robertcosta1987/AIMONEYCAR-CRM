@@ -2,11 +2,11 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Phone, Mail, FileText, MessageSquare, Calendar, Clock, Plus, Edit2, Check } from 'lucide-react'
+import { X, Phone, Mail, FileText, MessageSquare, Calendar, Clock, Plus, Edit2, Check, ArrowRightLeft } from 'lucide-react'
 import { GlassCard } from './primitives/glass-card'
 import { TemperatureChip } from './primitives/temperature-chip'
 import { LeadScoreBadge } from './primitives/lead-score-badge'
-import type { Lead, LeadActivity } from '@/lib/crm/leads'
+import type { Lead, LeadActivity, KanbanStage } from '@/lib/crm/leads'
 
 const activityIcons: Record<string, React.ElementType> = {
   note: FileText,
@@ -32,16 +32,18 @@ const activityLabels: Record<string, string> = {
 
 interface Props {
   lead: Lead | null
+  stages: KanbanStage[]
   onClose: () => void
   onUpdate: () => void
 }
 
-export function LeadDrawer({ lead, onClose, onUpdate }: Props) {
+export function LeadDrawer({ lead, stages, onClose, onUpdate }: Props) {
   const queryClient = useQueryClient()
   const [noteText, setNoteText] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [movingStage, setMovingStage] = useState(false)
 
   const { data: activities } = useQuery({
     queryKey: ['lead-activities', lead?.id],
@@ -110,6 +112,22 @@ export function LeadDrawer({ lead, onClose, onUpdate }: Props) {
     })
     queryClient.invalidateQueries({ queryKey: ['lead-detail', lead.id] })
     onUpdate()
+  }
+
+  async function moveToStage(stageId: string) {
+    if (!lead?.id || stageId === current?.stage_id) return
+    setMovingStage(true)
+    try {
+      await fetch(`/api/crm/leads/${lead.id}/stage`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage_id: stageId }),
+      })
+      queryClient.invalidateQueries({ queryKey: ['lead-detail', lead.id] })
+      onUpdate()
+    } finally {
+      setMovingStage(false)
+    }
   }
 
   function startEdit(field: string, value: string) {
@@ -222,6 +240,39 @@ export function LeadDrawer({ lead, onClose, onUpdate }: Props) {
                         <TemperatureChip value={t} className="pointer-events-none" />
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Move stage */}
+              {current && stages.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-[var(--crm-text-subtle)] uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    Mover Etapa
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {stages.map(stage => {
+                      const isCurrent = stage.id === current.stage_id
+                      return (
+                        <button
+                          key={stage.id}
+                          onClick={() => moveToStage(stage.id)}
+                          disabled={isCurrent || movingStage}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left ${
+                            isCurrent
+                              ? 'bg-[var(--crm-accent)]/15 text-[var(--crm-accent)] cursor-default ring-1 ring-[var(--crm-accent)]/30'
+                              : 'bg-[var(--crm-bg-paper)] text-[var(--crm-text-muted)] hover:bg-[var(--crm-bg-elevated)] hover:text-[var(--crm-text)] disabled:opacity-50'
+                          }`}
+                        >
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: stage.color }} />
+                          <span className="flex-1 truncate">{stage.name}</span>
+                          {isCurrent && (
+                            <span className="text-xs opacity-70 flex-shrink-0">atual</span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
